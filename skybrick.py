@@ -271,7 +271,65 @@ def polarbrick(brick):
         dec = 90 - dec
     plt.fill(ra, dec, axes=ax, color=color)
     
+if __name__ == '__main__':
+    #- Example code for writing brick+bricklets file
+    from astropy.io import fits
+    from astropy.table import Table
+    bricksize = 1.0
+    n = 4
+    bricks = Bricks(1.0)
+    
+    #- Bricklet arrays to fill; collect these as lists of arrays and convert
+    #- to a numpy array with np.concatenate at the end
+    ra_min = list()
+    ra_max = list()
+    dec_min = list()
+    dec_max = list()
+    kind = list()
 
+    for b in bricks:
+        bx = Bricklets(n, b)
+        ra_min.append(bx.ra_min)
+        ra_max.append(bx.ra_max)
+        dec_min.append(bx.dec_min)
+        dec_max.append(bx.dec_max)
+        kind.append(bx.kind)
+
+    ra_min = np.concatenate(ra_min).astype(np.float32)
+    ra_max = np.concatenate(ra_max).astype(np.float32)
+    dec_min = np.concatenate(dec_min)
+    dec_max = np.concatenate(dec_max)
+    kind = np.concatenate(kind)
+
+    #- Output results
+    outfile = 'bricks-{:.2f}-{}.fits'.format(bricksize, n)
+    brickdata = dict(
+        ra_min = bricks.ra_min, ra_max=bricks.ra_max,
+        dec_min = bricks.dec_min, dec_max = bricks.dec_max,
+        kind = bricks.kind
+        )
+        
+    brickletdata = dict(
+        ra_min = ra_min, ra_max = ra_max,
+        dec_min = dec_min, dec_max = dec_max,
+        kind = kind
+        )
+        
+    #- ensure ordering of columns
+    columns = ['ra_min', 'ra_max', 'dec_min', 'dec_max', 'kind']
+    brickdata = Table(brickdata, names=columns).as_array()
+    brickletdata = Table(brickletdata, names=columns).as_array()
+
+    hdus = fits.HDUList()
+    hdus.append(fits.PrimaryHDU(None))
+    hdus.append(fits.BinTableHDU(brickdata, name='BRICKS'))
+    hdus.append(fits.BinTableHDU(brickletdata, name='BRICKLETS'))
+    hdus.writeto(outfile, clobber=True)
+    
+    
+
+#-------------------------------------------------------------------------
+#- Scratch code for cutting and pasting
 """
 reload(skybrick)
 b = skybrick.Bricks(1.0)
