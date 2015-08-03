@@ -240,11 +240,22 @@ def plotbrick(brick):
     y = [brick.dec_min, brick.dec_min, brick.dec_max, brick.dec_max]
     plt.fill(x, y, color=color)
 
-def outlinebrick(brick):
+def outlinebrick(brick, polar=False):
     import matplotlib.pyplot as plt
-    x = [brick.ra_min, brick.ra_max, brick.ra_max, brick.ra_min, brick.ra_min]
-    y = [brick.dec_min, brick.dec_min, brick.dec_max, brick.dec_max, brick.dec_min]
-    plt.plot(x, y, 'k:', lw=2)
+    if polar:
+        n = 20
+        x = np.linspace(brick.ra_min, brick.ra_max, n) * np.pi / 180
+        ra = np.concatenate([x, x[-1::-1]])
+        dec = np.concatenate([np.ones(n)*brick.dec_min, np.ones(n)*brick.dec_max])
+        if brick.dec_min < 0:
+            dec = dec + 90
+        else:
+            dec = 90 - dec
+        plt.polar(ra, dec, 'k:', lw=2)
+    else:
+        x = [brick.ra_min, brick.ra_max, brick.ra_max, brick.ra_min, brick.ra_min]
+        y = [brick.dec_min, brick.dec_min, brick.dec_max, brick.dec_max, brick.dec_min]
+        plt.plot(x, y, 'k:', lw=2)
     
 def polarbrick(brick):
     import matplotlib.pyplot as plt
@@ -281,4 +292,13 @@ plt.ylabel('dec [deg]')
 plt.title('1 deg bricks -> 1/{} deg bricklets'.format(n))
 plt.savefig('bricklet-{}.png'.format(n), dpi=72)
 --
+
+plt.figure()
+[skybrick.polarbrick(x) for x in b[0:30]]
+
+plt.figure()
+for x in b[0:30]:
+    [skybrick.polarbrick(y) for y in skybrick.Bricklets(5, x)]
+    skybrick.outlinebrick(x, polar=True)
+
 """
