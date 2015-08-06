@@ -19,6 +19,8 @@ from __future__ import absolute_import, division, print_function
 import copy
 import numpy as np
 
+__version__ = "0.1"
+
 class Bricks(object):
     def __init__(self, bricksize=1.0):
         """
@@ -240,8 +242,10 @@ class Bricklets(Bricks):
             self.column = np.tile(np.arange(n, dtype=int), n)
 
         #- Add bricklet names
-        self.name = np.array(['{}-{:02d}'.format(b.name, i) for i in range(self.ntot)])
-        self.brickid = 100*b.brickid + np.arange(self.ntot, dtype=int)
+        self.brickname = np.array([b.name,]*self.ntot)
+        self.brickletname = np.array(['{}-{:02d}'.format(b.name, i) for i in range(self.ntot)])
+        self.brickid = np.ones(self.ntot) * b.brickid
+        self.brickletid = 100*b.brickid + np.arange(self.ntot, dtype=int)
         
         self.ra = 0.5*(self.ra_min + self.ra_max)
         self.dec = 0.5*(self.dec_min + self.dec_max)
@@ -299,16 +303,21 @@ def polarbrick(brick):
         
 if __name__ == '__main__':
     #- Example code for writing brick+bricklets file
+    #- python skybrick <bricksize> <n>
+    import sys
     from astropy.io import fits
     from astropy.table import Table
-    bricksize = 1.0
-    n = 4
-    bricks = Bricks(1.0)
+    
+    bricksize = float(sys.argv[1])
+    n = int(sys.argv[2])
+    bricks = Bricks(bricksize)
     
     #- Bricklet arrays to fill; collect these as lists of arrays and convert
     #- to a numpy array with np.concatenate at the end
-    name = list()
+    brickname = list()
     brickid = list()
+    brickletname = list()
+    brickletid = list()
     kind = list()
     row = list()
     column = list()
@@ -321,8 +330,10 @@ if __name__ == '__main__':
 
     for b in bricks:
         bx = Bricklets(n, b)
-        name.append(bx.name)
+        brickname.append(bx.brickname)
         brickid.append(bx.brickid)
+        brickletname.append(bx.brickletname)
+        brickletid.append(bx.brickletid)        
         kind.append(bx.kind)
         row.append(bx.row)
         column.append(bx.column)
@@ -333,8 +344,11 @@ if __name__ == '__main__':
         dec_min.append(bx.dec_min)
         dec_max.append(bx.dec_max)
 
-    name = np.concatenate(name)
+    brickname = np.concatenate(brickname)
     brickid = np.concatenate(brickid).astype(np.int32)
+    brickletname = np.concatenate(brickletname)
+    brickletid = np.concatenate(brickletid).astype(np.int32)
+    
     kind = np.concatenate(kind).astype(np.int16)
     row = np.concatenate(row).astype(np.int32)
     column = np.concatenate(column).astype(np.int32)
@@ -362,8 +376,10 @@ if __name__ == '__main__':
     )
 
     brickletdata = dict(
-        brickname = name,
-        brickid   = brickid,
+        brickname    = brickname,
+        brickid      = brickid,
+        brickletname = brickletname,
+        brickletid   = brickletid,
         brickq    = kind,
         brickrow  = row,
         brickcol  = column,
@@ -379,10 +395,18 @@ if __name__ == '__main__':
     columns = ['brickname', 'brickid', 'brickq', 'brickrow', 'brickcol',
         'ra', 'dec', 'ra1', 'ra2', 'dec1', 'dec2']
     brickdata = Table(brickdata, names=columns).as_array()
+
+    columns = ['brickletname', 'brickletid', 'brickname', 'brickid',
+        'brickq', 'brickrow', 'brickcol',
+        'ra', 'dec', 'ra1', 'ra2', 'dec1', 'dec2']
     brickletdata = Table(brickletdata, names=columns).as_array()
 
     hdus = fits.HDUList()
-    hdus.append(fits.PrimaryHDU(None))
+    x = fits.PrimaryHDU(None)
+    x.header['VSKYBRIC'] = (__version__, 'https://github.com/sbailey/skybrick version')
+    x.header['BRICKSIZ'] = (bricksize, 'Brick edge size in degrees')
+    x.header['BRICKLET'] = (n, '{} x {} Bricklets per Brick'.format(n, n))
+    hdus.append(x)
     hdus.append(fits.BinTableHDU(brickdata, name='BRICKS'))
     hdus.append(fits.BinTableHDU(brickletdata, name='BRICKLETS'))
     hdus.writeto(outfile, clobber=True)
